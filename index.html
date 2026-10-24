@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Painel Magestic</title>
+<style>
+:root{--bg:#0d0d0f;--card:#17171b;--line:#2a2a30;--fg:#f2f0ec;--mut:#9b98a3;--acc:#e2b34d;--bad:#e06a5c}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:22px;margin:0}
+.mut{color:var(--mut)}
+#login{max-width:360px;margin:12vh auto 0;background:var(--card);border:1px solid var(--line);border-radius:14px;padding:28px}
+#login h1{margin-bottom:4px}
+label{display:block;font-size:13px;color:var(--mut);margin:16px 0 6px}
+input{width:100%;padding:11px 12px;border-radius:9px;border:1px solid var(--line);background:#0f0f12;color:var(--fg);font-size:15px}
+button{cursor:pointer;font:inherit}
+.btn{width:100%;margin-top:20px;padding:12px;border:0;border-radius:9px;background:var(--acc);color:#111;font-weight:700}
+.btn:disabled{opacity:.6;cursor:wait}
+#erro{color:var(--bad);font-size:14px;min-height:20px;margin-top:12px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:18px}
+.per{display:flex;flex-wrap:wrap;gap:6px}
+.per button{padding:7px 12px;border-radius:999px;border:1px solid var(--line);background:transparent;color:var(--fg);font-size:14px}
+.per button[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#111;font-weight:700}
+.sair{background:none;border:1px solid var(--line);color:var(--mut);border-radius:8px;padding:7px 12px;font-size:13px}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin-bottom:18px}
+.tile{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.tile b{display:block;font-size:24px;margin:4px 0 2px;font-variant-numeric:tabular-nums}
+.tile span{font-size:13px;color:var(--mut)}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;justify-content:space-between;margin-bottom:10px}
+.bar input{max-width:320px}
+.tw{overflow-x:auto;border:1px solid var(--line);border-radius:12px}
+table{border-collapse:collapse;width:100%;min-width:1100px;font-variant-numeric:tabular-nums}
+th,td{padding:9px 10px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap;font-size:14px}
+th{position:sticky;top:0;background:var(--card);color:var(--mut);font-weight:600;font-size:12px;cursor:pointer;user-select:none}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--bg)}
+th:first-child{background:var(--card);z-index:1}
+td small{display:block;color:var(--mut);font-size:12px}
+tr:hover td{background:#141418}
+.foot{margin-top:18px;font-size:13px;color:var(--mut)}
+.hide{display:none}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <form id="login" autocomplete="on">
+    <h1>Painel Magestic</h1>
+    <div class="mut">Acesso restrito</div>
+    <label for="email">E-mail</label>
+    <input id="email" type="email" autocomplete="username" required>
+    <label for="senha">Senha</label>
+    <input id="senha" type="password" autocomplete="current-password" required>
+    <button class="btn" id="entrar" type="submit">Entrar</button>
+    <div id="erro" role="alert"></div>
+  </form>
+
+  <main id="app" class="hide">
+    <header>
+      <div><h1>Painel Magestic</h1><div class="mut" id="atual"></div></div>
+      <div class="per" id="per" role="group" aria-label="Período"></div>
+      <button class="sair" id="sair" type="button">Sair</button>
+    </header>
+    <section class="tiles" id="tiles"></section>
+    <div class="bar">
+      <input id="busca" type="search" placeholder="Buscar conta ou @instagram">
+      <span class="mut" id="cont"></span>
+    </div>
+    <div class="tw"><table><thead><tr id="th"></tr></thead><tbody id="tb"></tbody></table></div>
+    <p class="foot">Totais somam só contas em real. Conversas: iniciadas e respondidas por mensagem (janela de 7 dias). Visitas no perfil: vindas dos anúncios. Seguidores novos: ganho total do Instagram no período. Taxa = seguidores novos ÷ visitas no perfil. Atualiza a cada hora.</p>
+  </main>
+</div>
+<script>
+const PER={hoje:'Hoje',ontem:'Ontem','7d':'7 dias','30d':'30 dias',mes:'Este mês'};
+const COLS=[['conta','Conta'],['gasto','Valor usado'],['conversas_iniciadas','Conv. iniciadas'],['custo_conversa_iniciada','Custo/iniciada'],['conversas_retornadas','Conv. retornadas'],['custo_conversa_retornada','Custo/retornada'],['visitas_perfil','Visitas perfil'],['seguidores_novos','Seguidores'],['taxa_visita_seguidor','Visita→seguidor'],['compras','Compras'],['alcance','Alcance'],['frequencia','Frequência']];
+const $=id=>document.getElementById(id);
+const b64=s=>Uint8Array.from(atob(s),c=>c.charCodeAt(0));
+const hex=buf=>[...new Uint8Array(buf)].map(x=>x.toString(16).padStart(2,'0')).join('');
+const int=new Intl.NumberFormat('pt-BR');
+const dec=new Intl.NumberFormat('pt-BR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const money=(v,m)=>v==null?'—':new Intl.NumberFormat('pt-BR',{style:'currency',currency:m||'BRL'}).format(v);
+let DATA=null,periodo='7d',sortK='gasto',sortD=-1;
+
+async function abrir(email,senha){
+  const id=hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(email.trim().toLowerCase())));
+  const [ac,dd]=await Promise.all([fetch('acessos.json?t='+Date.now()).then(r=>r.json()),fetch('dados.enc.json?t='+Date.now()).then(r=>r.json())]);
+  const slot=ac.acessos.find(s=>s.id===id);
+  if(!slot) throw new Error('E-mail ou senha incorretos.');
+  const base=await crypto.subtle.importKey('raw',new TextEncoder().encode(senha),'PBKDF2',false,['deriveBits']);
+  const bits=new Uint8Array(await crypto.subtle.deriveBits({name:'PBKDF2',hash:'SHA-256',salt:b64(slot.salt),iterations:slot.iter},base,512));
+  if(hex(await crypto.subtle.digest('SHA-256',bits.slice(32)))!==slot.iv) throw new Error('E-mail ou senha incorretos.');
+  const w=b64(slot.wrapped),k=w.map((x,i)=>x^bits[i]);
+  const key=await crypto.subtle.importKey('raw',k,'AES-GCM',false,['decrypt']);
+  const plain=await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(dd.iv)},key,b64(dd.ct));
+  return {data:JSON.parse(new TextDecoder().decode(plain)),k};
+}
+
+$('login').addEventListener('submit',async e=>{
+  e.preventDefault();$('erro').textContent='';$('entrar').disabled=true;$('entrar').textContent='Verificando…';
+  try{
+    const r=await abrir($('email').value,$('senha').value);
+    try{sessionStorage.setItem('mg_k',btoa(String.fromCharCode(...r.k)))}catch(_){}
+    mostrar(r.data);
+  }catch(err){$('erro').textContent=err.message.includes('incorretos')?err.message:'Não foi possível abrir o painel. Tente de novo.'}
+  $('entrar').disabled=false;$('entrar').textContent='Entrar';
+});
+$('sair').onclick=()=>{try{sessionStorage.removeItem('mg_k')}catch(_){};location.reload()};
+
+(async()=>{ // reabre na mesma aba sem pedir senha de novo
+  let k;try{k=sessionStorage.getItem('mg_k')}catch(_){}
+  if(!k)return;
+  try{
+    const dd=await fetch('dados.enc.json?t='+Date.now()).then(r=>r.json());
+    const key=await crypto.subtle.importKey('raw',b64(k),'AES-GCM',false,['decrypt']);
+    mostrar(JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(dd.iv)},key,b64(dd.ct)))));
+  }catch(_){try{sessionStorage.removeItem('mg_k')}catch(_){}}
+})();
+
+function mostrar(d){
+  DATA=d;$('login').classList.add('hide');$('app').classList.remove('hide');
+  $('atual').textContent='Atualizado em '+new Date(d.gerado_em).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'});
+  $('per').innerHTML=Object.entries(PER).map(([k,v])=>`<button type="button" data-p="${k}">${v}</button>`).join('');
+  $('per').onclick=e=>{const p=e.target.dataset.p;if(p){periodo=p;render()}};
+  $('th').innerHTML=COLS.map(([k,v])=>`<th data-k="${k}">${v}</th>`).join('');
+  $('th').onclick=e=>{const k=e.target.dataset.k;if(!k)return;sortD=sortK===k?-sortD:(k==='conta'?1:-1);sortK=k;render()};
+  $('busca').oninput=render;render();
+}
+const fmt=(k,v,m)=>{
+  if(v==null||v==='')return '—';
+  if(k==='gasto'||k.startsWith('custo'))return money(v,m);
+  if(k==='taxa_visita_seguidor')return dec.format(v*100)+'%';
+  if(k==='frequencia')return dec.format(v);
+  return int.format(v);
+};
+function render(){
+  [...$('per').children].forEach(b=>b.setAttribute('aria-pressed',b.dataset.p===periodo));
+  const all=DATA.rows.filter(r=>r.periodo===periodo);
+  const brl=all.filter(r=>r.moeda==='BRL');
+  const s=k=>brl.reduce((a,r)=>a+(+r[k]||0),0);
+  const g=s('gasto'),ci=s('conversas_iniciadas'),cr=s('conversas_retornadas'),vp=s('visitas_perfil'),sg=s('seguidores_novos');
+  const t=[['Valor usado',money(g),brl.filter(r=>r.gasto>0).length+' contas'],['Conversas iniciadas',int.format(ci),ci?money(g/ci)+' cada':'—'],['Conversas retornadas',int.format(cr),cr?money(g/cr)+' cada':'—'],['Visitas no perfil',int.format(vp),'pelos anúncios'],['Seguidores novos',int.format(sg),vp?dec.format(sg/vp*100)+'% das visitas':'—'],['Compras',int.format(s('compras')),'eventos de compra']];
+  $('tiles').innerHTML=t.map(([a,b,c])=>`<div class="tile"><span>${a}</span><b>${b}</b><span>${c}</span></div>`).join('');
+  const q=$('busca').value.trim().toLowerCase();
+  const rows=all.filter(r=>!q||(r.conta+' '+(r.instagram||'')).toLowerCase().includes(q)).sort((a,b)=>{
+    const x=a[sortK],y=b[sortK];if(x==null)return 1;if(y==null)return -1;
+    return (typeof x==='string'?x.localeCompare(y,'pt-BR'):x-y)*sortD});
+  $('cont').textContent=rows.length+' contas';
+  const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  $('tb').innerHTML=rows.map(r=>'<tr>'+COLS.map(([k])=>k==='conta'?`<td>${esc(r.conta)}${r.instagram?`<small>@${esc(r.instagram)}</small>`:''}</td>`:`<td>${fmt(k,r[k],r.moeda)}</td>`).join('')+'</tr>').join('');
+  [...$('th').children].forEach(th=>th.textContent=COLS.find(c=>c[0]===th.dataset.k)[1]+(th.dataset.k===sortK?(sortD>0?' ▲':' ▼'):''));
+}
+</script>
+</body>
+</html>
